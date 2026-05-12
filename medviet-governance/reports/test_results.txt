@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.3, pluggy-1.6.0 -- /home/dang/Projects/vinai/Day24-Track02-Lab-Assignment/medviet-governance/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/dang/Projects/vinai/Day24-Track02-Lab-Assignment/medviet-governance
+plugins: anyio-4.13.0, Faker-40.15.0
+collecting ... collected 8 items
+
+tests/test_pii.py::TestPIIDetection::test_cccd_detected PASSED           [ 12%]
+tests/test_pii.py::TestPIIDetection::test_phone_detected PASSED          [ 25%]
+tests/test_pii.py::TestPIIDetection::test_email_detected PASSED          [ 37%]
+tests/test_pii.py::TestPIIDetection::test_detection_rate_above_95_percent PASSED [ 50%]
+tests/test_pii.py::TestAnonymization::test_pii_not_in_output PASSED      [ 62%]
+tests/test_pii.py::TestAnonymization::test_non_pii_columns_unchanged PASSED [ 75%]
+tests/test_pii.py::TestAnonymization::test_patient_id_unchanged PASSED   [ 87%]
+tests/test_pii.py::TestAnonymization::test_row_count_unchanged PASSED    [100%]
+
+============================== 8 passed in 1.77s ===============================

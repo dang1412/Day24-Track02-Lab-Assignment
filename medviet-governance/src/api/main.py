@@ -8,54 +8,61 @@ from src.pii.anonymizer import MedVietAnonymizer
 app = FastAPI(title="MedViet Data API", version="1.0.0")
 anonymizer = MedVietAnonymizer()
 
-# --- ENDPOINT 1 ---
+RAW_DATA_PATH = "data/raw/patients_raw.csv"
+
+
 @app.get("/api/patients/raw")
 @require_permission(resource="patient_data", action="read")
 async def get_raw_patients(
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    TODO: Trả về raw patient data (chỉ admin được phép).
-    Load từ data/raw/patients_raw.csv
-    Trả về 10 records đầu tiên dưới dạng JSON.
-    """
-    pass
+    """Trả về raw patient data — chỉ admin được phép."""
+    df = pd.read_csv(RAW_DATA_PATH)
+    return JSONResponse(content=df.head(10).to_dict(orient="records"))
 
-# --- ENDPOINT 2 ---
+
 @app.get("/api/patients/anonymized")
 @require_permission(resource="training_data", action="read")
 async def get_anonymized_patients(
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    TODO: Trả về anonymized data (ml_engineer và admin được phép).
-    Load raw data → anonymize → trả về JSON.
-    """
-    pass
+    """Trả về anonymized data — ml_engineer và admin được phép."""
+    df = pd.read_csv(RAW_DATA_PATH)
+    df_anon = anonymizer.anonymize_dataframe(df.head(10))
+    return JSONResponse(content=df_anon.to_dict(orient="records"))
 
-# --- ENDPOINT 3 ---
+
 @app.get("/api/metrics/aggregated")
 @require_permission(resource="aggregated_metrics", action="read")
 async def get_aggregated_metrics(
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    TODO: Trả về aggregated metrics (data_analyst, ml_engineer, admin).
-    Ví dụ: số bệnh nhân theo từng loại bệnh (không có PII).
-    """
-    pass
+    """Trả về aggregated metrics — data_analyst, ml_engineer, admin."""
+    df = pd.read_csv(RAW_DATA_PATH)
+    metrics = {
+        "total_patients": len(df),
+        "by_disease": df["benh"].value_counts().to_dict(),
+        "avg_test_result": round(df["ket_qua_xet_nghiem"].mean(), 2),
+        "min_test_result": round(df["ket_qua_xet_nghiem"].min(), 2),
+        "max_test_result": round(df["ket_qua_xet_nghiem"].max(), 2),
+    }
+    return JSONResponse(content=metrics)
 
-# --- ENDPOINT 4 ---
+
 @app.delete("/api/patients/{patient_id}")
 @require_permission(resource="patient_data", action="delete")
 async def delete_patient(
     patient_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """
-    TODO: Chỉ admin được xóa. Các role khác nhận 403.
-    """
-    pass
+    """Chỉ admin được xóa bệnh nhân."""
+    df = pd.read_csv(RAW_DATA_PATH)
+    if patient_id not in df["patient_id"].values:
+        raise HTTPException(status_code=404, detail=f"Patient {patient_id} not found")
+    df = df[df["patient_id"] != patient_id]
+    df.to_csv(RAW_DATA_PATH, index=False)
+    return {"status": "deleted", "patient_id": patient_id}
+
 
 @app.get("/health")
 async def health():

@@ -1,60 +1,11 @@
 # src/quality/validation.py
+import re
 import pandas as pd
-import great_expectations as gx
-from great_expectations.core.expectation_suite import ExpectationSuite
 
-def build_patient_expectation_suite() -> ExpectationSuite:
+
+def validate_anonymized_data(filepath: str, original_filepath: str = None) -> dict:
     """
-    TODO: Tạo expectation suite cho anonymized patient data.
-    """
-    context = gx.get_context()
-    suite = context.add_expectation_suite("patient_data_suite")
-
-    # Lấy validator
-    df = pd.read_csv("data/raw/patients_raw.csv")
-    validator = context.sources.pandas_default.read_dataframe(df)
-
-    # --- TASK: Thêm các expectations ---
-
-    # 1. patient_id không được null
-    validator.expect_column_values_to_not_be_null("patient_id")
-
-    # 2. TODO: cccd phải có đúng 12 ký tự
-    validator.expect_column_value_lengths_to_equal(
-        column=___,
-        value=___
-    )
-
-    # 3. TODO: ket_qua_xet_nghiem phải trong khoảng [0, 50]
-    validator.expect_column_values_to_be_between(
-        column=___,
-        min_value=___,
-        max_value=___
-    )
-
-    # 4. TODO: benh phải thuộc danh sách hợp lệ
-    valid_conditions = ["Tiểu đường", "Huyết áp cao", "Tim mạch", "Khỏe mạnh"]
-    validator.expect_column_values_to_be_in_set(
-        column=___,
-        value_set=___
-    )
-
-    # 5. TODO: email phải match regex pattern
-    validator.expect_column_values_to_match_regex(
-        column="email",
-        regex=r"___"    # TODO: email regex
-    )
-
-    # 6. TODO: Không được có duplicate patient_id
-    validator.expect_column_values_to_be_unique(column=___)
-
-    validator.save_expectation_suite()
-    return suite
-
-
-def validate_anonymized_data(filepath: str) -> dict:
-    """
-    TODO: Validate anonymized data.
+    Validate anonymized data.
     Trả về dict: {"success": bool, "failed_checks": list, "stats": dict}
     """
     df = pd.read_csv(filepath)
@@ -67,14 +18,69 @@ def validate_anonymized_data(filepath: str) -> dict:
         }
     }
 
-    # Check 1: Không còn CCCD gốc dạng số thuần túy
-    # (sau anonymization, cccd phải là fake hoặc masked)
-    # TODO: implement check
+    # Check 1: CCCD trong anonymized phải khác CCCD gốc
+    if original_filepath:
+        df_orig = pd.read_csv(original_filepath)
+        orig_cccds = set(df_orig["cccd"].astype(str).str.zfill(12))
+        anon_cccds = set(df["cccd"].astype(str).str.zfill(12))
+        leaked = orig_cccds & anon_cccds
+        if leaked:
+            results["success"] = False
+            results["failed_checks"].append(
+                f"Check 1 FAILED: {len(leaked)} original CCCDs still present in anonymized output"
+            )
 
     # Check 2: Không có null values trong các cột quan trọng
-    # TODO: implement check
+    important_cols = ["patient_id", "benh", "ket_qua_xet_nghiem"]
+    for col in important_cols:
+        if col in df.columns:
+            null_count = df[col].isnull().sum()
+            if null_count > 0:
+                results["success"] = False
+                results["failed_checks"].append(
+                    f"Check 2 FAILED: column '{col}' has {null_count} null values"
+                )
 
-    # Check 3: Số rows phải bằng original
-    # TODO: implement check
+    # Check 3: Số rows phải bằng original nếu có
+    if original_filepath:
+        df_orig = pd.read_csv(original_filepath)
+        if len(df) != len(df_orig):
+            results["success"] = False
+            results["failed_checks"].append(
+                f"Check 3 FAILED: row count mismatch {len(df)} vs {len(df_orig)}"
+            )
+
+    # Check 4: ket_qua_xet_nghiem trong khoảng hợp lệ [0, 50]
+    if "ket_qua_xet_nghiem" in df.columns:
+        out_of_range = df[
+            (df["ket_qua_xet_nghiem"] < 0) | (df["ket_qua_xet_nghiem"] > 50)
+        ]
+        if len(out_of_range) > 0:
+            results["success"] = False
+            results["failed_checks"].append(
+                f"Check 4 FAILED: {len(out_of_range)} rows have out-of-range test results"
+            )
+
+    # Check 5: benh phải thuộc danh sách hợp lệ
+    valid_conditions = {"Tiểu đường", "Huyết áp cao", "Tim mạch", "Khỏe mạnh"}
+    if "benh" in df.columns:
+        invalid_benh = df[~df["benh"].isin(valid_conditions)]
+        if len(invalid_benh) > 0:
+            results["success"] = False
+            results["failed_checks"].append(
+                f"Check 5 FAILED: {len(invalid_benh)} rows have invalid 'benh' values"
+            )
+
+    # Check 6: Không có duplicate patient_id
+    if "patient_id" in df.columns:
+        dup_count = df["patient_id"].duplicated().sum()
+        if dup_count > 0:
+            results["success"] = False
+            results["failed_checks"].append(
+                f"Check 6 FAILED: {dup_count} duplicate patient_id values"
+            )
+
+    if results["success"]:
+        results["message"] = "All validation checks passed"
 
     return results

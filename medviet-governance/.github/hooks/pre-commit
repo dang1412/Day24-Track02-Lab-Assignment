@@ -3,27 +3,41 @@
 
 echo "🔍 Running security checks..."
 
-# 1. git-secrets scan
-git secrets --pre_commit_hook -- "$@"
-if [ $? -ne 0 ]; then
-    echo "❌ git-secrets found potential secrets! Commit blocked."
-    exit 1
+# 1. git-secrets scan (skip nếu chưa cài)
+if git secrets --version &>/dev/null 2>&1; then
+    git secrets --pre_commit_hook -- "$@"
+    if [ $? -ne 0 ]; then
+        echo "❌ git-secrets found potential secrets! Commit blocked."
+        exit 1
+    fi
+else
+    echo "⚠️  git-secrets not installed, skipping. Install with: brew install git-secrets"
 fi
 
-# 2. Bandit SAST scan
+# 2. Bandit SAST scan (dùng venv nếu có)
 echo "🐍 Running Bandit SAST..."
-bandit -r src/ -ll -q
-if [ $? -ne 0 ]; then
-    echo "❌ Bandit found security issues! Review above."
-    exit 1
+BANDIT=$(command -v bandit || echo ".venv/bin/bandit")
+if [ -f "$BANDIT" ] || command -v bandit &>/dev/null; then
+    $BANDIT -r src/ -ll -q
+    if [ $? -ne 0 ]; then
+        echo "❌ Bandit found security issues! Review above."
+        exit 1
+    fi
+else
+    echo "⚠️  bandit not found, skipping."
 fi
 
-# 3. pip-audit dependency check
+# 3. pip-audit dependency check (skip nếu chưa cài)
 echo "📦 Checking dependencies for CVEs..."
-pip-audit --desc on
-if [ $? -ne 0 ]; then
-    echo "⚠️  Vulnerable dependencies found! Update before committing."
-    exit 1
+PIP_AUDIT=$(command -v pip-audit || echo ".venv/bin/pip-audit")
+if command -v pip-audit &>/dev/null || [ -f ".venv/bin/pip-audit" ]; then
+    $PIP_AUDIT --desc on
+    if [ $? -ne 0 ]; then
+        echo "⚠️  Vulnerable dependencies found! Update before committing."
+        exit 1
+    fi
+else
+    echo "⚠️  pip-audit not found, skipping."
 fi
 
 echo "✅ All security checks passed!"
