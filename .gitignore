@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Secrets & keys
+.vault_key
+*.key
+*.pem
+.env
+
+# Data - raw PII không được commit
+medviet-governance/data/raw/
+
+# Submission zip
+*.zip
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
